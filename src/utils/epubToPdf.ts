@@ -4,7 +4,7 @@ import html2canvas from 'html2canvas';
 /**
  * 将 HTML 内容转换为 PDF
  */
-export async function htmlToPdf(htmlContent: string, title: string): Promise<Uint8Array> {
+export async function htmlToPdf(htmlContent: string, _title: string): Promise<Uint8Array> {
   // 创建临时容器
   const container = document.createElement('div');
   container.style.position = 'absolute';
@@ -73,7 +73,7 @@ export async function htmlToPdf(htmlContent: string, title: string): Promise<Uin
  * 下载 PDF 文件
  */
 export function downloadPdfFromBytes(pdfBytes: Uint8Array, filename: string): void {
-  const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+  const blob = new Blob([pdfBytes.buffer.slice(pdfBytes.byteOffset, pdfBytes.byteOffset + pdfBytes.byteLength) as ArrayBuffer], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;

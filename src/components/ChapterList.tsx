@@ -130,7 +130,7 @@ export const ChapterList: React.FC<ChapterListProps> = ({
   const isSomeSelected = selectedChapters.size > 0;
 
   // 递归渲染章节树
-  const renderChapter = (chapter: Chapter, index: number, level: number = 0): React.ReactNode => {
+  const renderChapter = (chapter: Chapter, _index: number, level: number = 0): React.ReactNode => {
     const isExpanded = expandedChapters.has(chapter.id);
     const isSelected = selectedChapters.has(chapter.id);
     const hasChildren = chapter.children && chapter.children.length > 0;

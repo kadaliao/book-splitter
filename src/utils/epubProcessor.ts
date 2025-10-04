@@ -438,7 +438,7 @@ export async function createEpubFromChapters(
  * 下载 EPUB 文件
  */
 export function downloadEpub(epubBytes: Uint8Array, filename: string): void {
-  const blob = new Blob([epubBytes], { type: 'application/epub+zip' });
+  const blob = new Blob([epubBytes.buffer.slice(epubBytes.byteOffset, epubBytes.byteOffset + epubBytes.byteLength) as ArrayBuffer], { type: 'application/epub+zip' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
