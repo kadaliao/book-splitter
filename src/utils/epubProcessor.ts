@@ -296,32 +296,29 @@ export async function extractEpubChapters(
     throw new Error('此 EPUB 文件没有目录信息，无法自动识别章节');
   }
 
-  // 只收集叶子节点（没有子章节的章节）以便加载内容
-  const leafChapters: EpubChapter[] = [];
-  const collectLeaves = (items: EpubChapter[]) => {
+  // 收集所有章节（包括父章节和叶子节点）以便加载内容
+  const allChapters: EpubChapter[] = [];
+  const collectAll = (items: EpubChapter[]) => {
     items.forEach(item => {
-      if (!item.children || item.children.length === 0) {
-        // 叶子节点
-        leafChapters.push(item);
-      } else {
-        // 有子节点，继续递归
-        collectLeaves(item.children);
+      allChapters.push(item);
+      if (item.children && item.children.length > 0) {
+        collectAll(item.children);
       }
     });
   };
-  collectLeaves(chapters);
+  collectAll(chapters);
 
   // 按文件路径分组，避免重复加载同一个文件
   const fileCache = new Map<string, string>();
 
-  // 并行加载叶子章节内容，使用节流控制进度更新
-  const totalChapters = leafChapters.length;
+  // 并行加载所有章节内容，使用节流控制进度更新
+  const totalChapters = allChapters.length;
   const batchSize = 10;
   let lastUpdateTime = Date.now();
   const updateInterval = 100; // 每100ms最多更新一次进度
 
-  for (let i = 0; i < leafChapters.length; i += batchSize) {
-    const batch = leafChapters.slice(i, Math.min(i + batchSize, leafChapters.length));
+  for (let i = 0; i < allChapters.length; i += batchSize) {
+    const batch = allChapters.slice(i, Math.min(i + batchSize, allChapters.length));
 
     await Promise.all(
       batch.map(async (chapter, batchIndex) => {
