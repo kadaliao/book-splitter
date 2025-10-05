@@ -238,6 +238,46 @@ export async function extractPdfPages(
 }
 
 /**
+ * 渲染 PDF 页面为图片
+ * @param file PDF文件
+ * @param pageNumber 页码(1-based)
+ * @param scale 缩放比例,默认1.5
+ * @returns 页面的base64图片数据URL
+ */
+export async function renderPdfPageToImage(
+  file: File,
+  pageNumber: number,
+  scale: number = 1.5
+): Promise<string> {
+  const arrayBuffer = await file.arrayBuffer();
+  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+  const pdfDoc = await loadingTask.promise;
+
+  const page = await pdfDoc.getPage(pageNumber);
+  const viewport = page.getViewport({ scale });
+
+  // 创建canvas
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  if (!context) {
+    throw new Error('无法创建canvas context');
+  }
+
+  canvas.height = viewport.height;
+  canvas.width = viewport.width;
+
+  // 渲染页面到canvas
+  await page.render({
+    canvasContext: context,
+    viewport: viewport,
+    intent: 'display'
+  } as any).promise;
+
+  // 转换为图片数据URL
+  return canvas.toDataURL('image/png');
+}
+
+/**
  * 下载 PDF 文件
  */
 export function downloadPdf(pdfBytes: Uint8Array, filename: string): void {

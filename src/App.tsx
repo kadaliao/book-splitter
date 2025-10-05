@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { FileUpload } from './components/FileUpload';
 import { ChapterList } from './components/ChapterList';
-import { extractPdfChapters, extractPdfPages, downloadPdf } from './utils/pdfProcessor';
+import { ChapterPreview } from './components/ChapterPreview';
+import { extractPdfChapters, extractPdfPages, downloadPdf, renderPdfPageToImage } from './utils/pdfProcessor';
 import { extractEpubChapters } from './utils/epubProcessor';
 import { htmlToPdf } from './utils/epubToPdf';
 import { buildHierarchicalFilename } from './utils/filenameUtils';
@@ -26,11 +27,28 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ current: number; total: number; title: string } | null>(null);
 
+  // 预览相关状态
+  const [previewChapter, setPreviewChapter] = useState<Chapter | null>(null);
+  const [previewContent, setPreviewContent] = useState<string | null>(null);
+  const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const previewCacheRef = useRef<Map<string, string>>(new Map());
+  const previewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const handleFileSelect = async (selectedFile: File) => {
     setFile(selectedFile);
     setError(null);
     setProgress({ current: 0, total: 1, title: '正在读取文件...' });
     setIsProcessing(true);
+
+    // 清空预览状态
+    setPreviewChapter(null);
+    setPreviewContent(null);
+    setPreviewPosition(null);
+    previewCacheRef.current.clear();
+    if (previewTimeoutRef.current) {
+      clearTimeout(previewTimeoutRef.current);
+    }
 
     try {
       const detectedFileType = selectedFile.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'epub';
@@ -431,6 +449,83 @@ function App() {
     }
   };
 
+  const handlePreviewChapter = async (chapter: Chapter, position: { x: number; y: number }) => {
+    if (!file) return;
+
+    // 清除之前的延时
+    if (previewTimeoutRef.current) {
+      clearTimeout(previewTimeoutRef.current);
+    }
+
+    // 设置新的延时（防抖）- 减少延迟时间
+    previewTimeoutRef.current = setTimeout(async () => {
+      setPreviewChapter(chapter);
+      setPreviewPosition(position);
+      setIsLoadingPreview(true);
+
+      try {
+        // 检查缓存
+        if (previewCacheRef.current.has(chapter.id)) {
+          setPreviewContent(previewCacheRef.current.get(chapter.id)!);
+          setIsLoadingPreview(false);
+          return;
+        }
+
+        let content = '';
+
+        if (fileType === 'pdf') {
+          // 渲染PDF第一页为图片
+          if (chapter.startPage) {
+            content = await renderPdfPageToImage(file, chapter.startPage, 1.5);
+          }
+        } else {
+          // EPUB显示完整的HTML内容
+          content = chapter.content || '';
+        }
+
+        // 缓存内容
+        previewCacheRef.current.set(chapter.id, content);
+        setPreviewContent(content);
+      } catch (err) {
+        console.error('加载预览内容失败:', err);
+        setPreviewContent('');
+      } finally {
+        setIsLoadingPreview(false);
+      }
+    }, 300); // 300ms延迟
+  };
+
+  const handleHidePreview = () => {
+    // 延迟隐藏，给鼠标时间移动到预览窗口
+    if (previewTimeoutRef.current) {
+      clearTimeout(previewTimeoutRef.current);
+    }
+    previewTimeoutRef.current = setTimeout(() => {
+      setPreviewChapter(null);
+      setPreviewContent(null);
+      setPreviewPosition(null);
+    }, 150);
+  };
+
+  // 鼠标进入预览窗口时，取消隐藏延迟
+  const handlePreviewMouseEnter = () => {
+    if (previewTimeoutRef.current) {
+      clearTimeout(previewTimeoutRef.current);
+      previewTimeoutRef.current = null;
+    }
+  };
+
+  // 鼠标离开预览窗口时，立即隐藏
+  const handlePreviewMouseLeave = () => {
+    if (previewTimeoutRef.current) {
+      clearTimeout(previewTimeoutRef.current);
+      previewTimeoutRef.current = null;
+    }
+    setPreviewChapter(null);
+    setPreviewContent(null);
+    setPreviewPosition(null);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
       <header className="bg-white/80 backdrop-blur-sm shadow-sm border-b border-gray-200">
@@ -564,9 +659,22 @@ function App() {
                   fileType={fileType}
                   isProcessing={isProcessing}
                   onExport={handleExport}
+                  onPreviewChapter={handlePreviewChapter}
+                  onHidePreview={handleHidePreview}
                 />
               </div>
             )}
+
+            {/* 悬浮预览窗口 */}
+            <ChapterPreview
+              chapter={previewChapter}
+              fileType={fileType}
+              previewContent={previewContent}
+              isLoading={isLoadingPreview}
+              position={previewPosition}
+              onMouseEnter={handlePreviewMouseEnter}
+              onMouseLeave={handlePreviewMouseLeave}
+            />
           </div>
         )}
       </main>

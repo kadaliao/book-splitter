@@ -15,6 +15,8 @@ interface ChapterListProps {
   fileType: 'pdf' | 'epub';
   isProcessing?: boolean;
   onExport: (selectedChapters: Chapter[], mergeMode: 'separate' | 'merge', mergedChapterIds: Set<string>) => void;
+  onPreviewChapter: (chapter: Chapter, position: { x: number; y: number }) => void;
+  onHidePreview: () => void;
 }
 
 export const ChapterList: React.FC<ChapterListProps> = ({
@@ -22,6 +24,8 @@ export const ChapterList: React.FC<ChapterListProps> = ({
   fileType,
   isProcessing = false,
   onExport,
+  onPreviewChapter,
+  onHidePreview,
 }) => {
   const [selectedChapters, setSelectedChapters] = useState<Set<string>>(new Set());
   const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set());
@@ -129,6 +133,16 @@ export const ChapterList: React.FC<ChapterListProps> = ({
   const isAllSelected = selectedChapters.size === allChapterIds.length && allChapterIds.length > 0;
   const isSomeSelected = selectedChapters.size > 0;
 
+  const handlePreviewHover = (chapter: Chapter, event: React.MouseEvent) => {
+    event.stopPropagation();
+    // 使用鼠标的实际位置
+    const position = {
+      x: event.clientX + 20, // 在鼠标右侧20px
+      y: event.clientY + 10, // 在鼠标下方10px
+    };
+    onPreviewChapter(chapter, position);
+  };
+
   // 递归渲染章节树
   const renderChapter = (chapter: Chapter, _index: number, level: number = 0): React.ReactNode => {
     const isExpanded = expandedChapters.has(chapter.id);
@@ -168,10 +182,10 @@ export const ChapterList: React.FC<ChapterListProps> = ({
               {/* 复选框区域 */}
               <div
                 onClick={() => handleToggleChapter(chapter.id, chapter)}
-                className="flex-1 flex items-center space-x-2 sm:space-x-3 min-w-0"
+                className="flex-shrink-0"
               >
                 <div className={`
-                  flex-shrink-0 w-4 h-4 sm:w-5 sm:h-5 rounded border-2 flex items-center justify-center transition-all
+                  w-4 h-4 sm:w-5 sm:h-5 rounded border-2 flex items-center justify-center transition-all
                   ${isSelected
                     ? 'bg-white border-white'
                     : 'border-gray-300 group-hover:border-blue-400'
@@ -183,24 +197,31 @@ export const ChapterList: React.FC<ChapterListProps> = ({
                     </svg>
                   )}
                 </div>
+              </div>
 
-                {/* 章节信息 */}
-                <div className="flex-1 min-w-0 text-left">
-                  <h3 className={`
-                    text-xs sm:text-sm font-semibold truncate
+              {/* 章节信息 */}
+              <div
+                onClick={() => handleToggleChapter(chapter.id, chapter)}
+                className="flex-1 min-w-0 text-left cursor-pointer flex flex-col"
+              >
+                <h3
+                  className={`
+                    text-xs sm:text-sm font-semibold truncate inline-block max-w-fit
                     ${isSelected ? 'text-white' : 'text-gray-900'}
+                  `}
+                  onMouseEnter={(e) => handlePreviewHover(chapter, e)}
+                  onMouseLeave={onHidePreview}
+                >
+                  {chapter.title}
+                </h3>
+                {fileType === 'pdf' && chapter.startPage && chapter.endPage && (
+                  <p className={`
+                    text-xs mt-0.5 sm:mt-1
+                    ${isSelected ? 'text-white/90' : 'text-gray-500'}
                   `}>
-                    {chapter.title}
-                  </h3>
-                  {fileType === 'pdf' && chapter.startPage && chapter.endPage && (
-                    <p className={`
-                      text-xs mt-0.5 sm:mt-1
-                      ${isSelected ? 'text-white/90' : 'text-gray-500'}
-                    `}>
-                      P.{chapter.startPage}-{chapter.endPage} ({chapter.endPage - chapter.startPage + 1} 页)
-                    </p>
-                  )}
-                </div>
+                    P.{chapter.startPage}-{chapter.endPage} ({chapter.endPage - chapter.startPage + 1} 页)
+                  </p>
+                )}
               </div>
 
               {/* 合并子章节按钮 */}
